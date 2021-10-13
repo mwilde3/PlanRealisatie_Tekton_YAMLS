@@ -1,0 +1,174 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: git-trigger
+spec:
+  # We need this serviceaccount for the correct RBAC rights
+  serviceAccountName: tekton-triggers
+
+  ##
+  ## Only use the parts in this eventlistener which you need.
+  ## After copying, just remove the other parts.
+  ##
+
+  triggers:
+  ## FAST-API - Change the repository if you copy this
+  - name: werkpakket-monitoring-main-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref in ['refs/heads/master']"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-prd
+    template:
+      ref: werkpakket-monitoring
+
+  - name: werkpakket-monitoring-develop-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref in ['refs/heads/develop']"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-tst
+    template:
+      ref: werkpakket-monitoring-develop
+
+  - name: werkpakket-monitoring-release-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref in ['refs/heads/release']"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-acc
+    template:
+      ref: werkpakket-monitoring
+
+  - name: werkpakket-monitoring-feature-branches-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref.startsWith('refs/heads/feature-')"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-dev
+    template:
+      ref: werkpakket-monitoring-develop
+
+  - name: werkpakket-monitoring-dash-main-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref in ['refs/heads/master']"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-prd
+    template:
+      ref: werkpakket-monitoring-dash
+
+  - name: werkpakket-monitoring-dash-develop-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref in ['refs/heads/develop']"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-tst
+    template:
+      ref: werkpakket-monitoring-dash-develop
+
+  - name: werkpakket-monitoring-dash-release-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref in ['refs/heads/release']"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-acc
+    template:
+      ref: werkpakket-monitoring-dash
+
+  - name: werkpakket-monitoring-dash-feature-branches-listener
+    interceptors:
+      - github:
+          eventTypes: ["push"]
+      - cel:
+          filter: "body.ref.startsWith('refs/heads/feature-')"
+          overlays:
+            - key: branch
+              expression: "body.ref.split('/')[2]"
+      - cel:
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+    bindings:
+      - ref: github-push
+      - name: branch
+        value: $(extensions.branch)
+      - name: namespace
+        value: ip-ppap-dev
+    template:
+      ref: werkpakket-monitoring-dash-develop

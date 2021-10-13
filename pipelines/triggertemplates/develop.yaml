@@ -1,0 +1,63 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: werkpakket-monitoring-dash-develop
+spec:
+  params:
+  - name: gitrevision
+    description: The git revision
+  - name: gitcommitmessage
+    description: The git commit message
+  - name: branch
+    description: The branch
+  - name: namespace
+    description: The namespace to deploy to
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: werkpakket-monitoring-dash-$(tt.params.branch)-
+        namespace: ip-ppap-ops
+        labels:
+          app: werkpakket-monitoring-dash
+          type: $(tt.params.branch)
+          revision: $(tt.params.gitrevision)
+      spec:
+        serviceAccountNames:
+        - taskName: build-container
+          serviceAccountName: builder
+        - taskName: deploy
+          serviceAccountName: pipeline
+        pipelineRef:
+          name: werkpakket-monitoring-develop
+        params:
+        - name: sonar-projectname
+          value: werkpakket-monitoring-dash
+        - name: image
+          value: "image-registry.openshift-image-registry.svc:5000/ip-ppap-ops/werkpakket-monitoring-dash"
+        - name: commit
+          value: $(tt.params.gitrevision)
+        - name: commitMessage
+          value: $(tt.params.gitcommitmessage)
+        - name: namespace
+          value: $(tt.params.namespace)
+        - name: appName
+          value: werkpakket-monitoring-dash-$(tt.params.branch)
+        - name: branch
+          value: $(tt.params.branch)
+        - name: repoUrl
+          value: Alliander/Werkpakket_Monitoring_Dash
+        - name: pythonVersion
+          value: 3.9.1
+        workspaces:
+        - name: git-basic-auth-creds
+          secret:
+            secretName: github-basic-auth
+        - name: shared-workspace
+          volumeClaimTemplate:
+            spec:
+              accessModes: 
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
