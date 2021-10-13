@@ -1,7 +1,7 @@
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
-  name: werkpakket-monitoring-dash-develop
+  name: werkpakket-monitoring-develop
 spec:
   params:
   - name: gitrevision
@@ -16,10 +16,10 @@ spec:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
-        generateName: werkpakket-monitoring-dash-$(tt.params.branch)-
+        generateName: werkpakket-monitoring-$(tt.params.branch)-
         namespace: ip-ppap-ops
         labels:
-          app: werkpakket-monitoring-dash
+          app: werkpakket-monitoring
           type: $(tt.params.branch)
           revision: $(tt.params.gitrevision)
       spec:
@@ -29,12 +29,12 @@ spec:
         - taskName: deploy
           serviceAccountName: pipeline
         pipelineRef:
-          name: werkpakket-monitoring-develop
+          name: werkpakket-monitoring-api-develop
         params:
         - name: sonar-projectname
-          value: werkpakket-monitoring-dash
+          value: werkpakket-monitoring-api
         - name: image
-          value: "image-registry.openshift-image-registry.svc:5000/ip-ppap-ops/werkpakket-monitoring-dash"
+          value: "image-registry.openshift-image-registry.svc:5000/ip-ppap-ops/template-werkpakket-monitoring"
         - name: commit
           value: $(tt.params.gitrevision)
         - name: commitMessage
@@ -42,11 +42,11 @@ spec:
         - name: namespace
           value: $(tt.params.namespace)
         - name: appName
-          value: werkpakket-monitoring-dash-$(tt.params.branch)
+          value: werkpakket-monitoring-$(tt.params.branch)
         - name: branch
           value: $(tt.params.branch)
         - name: repoUrl
-          value: Alliander/Werkpakket_Monitoring_Dash
+          value: Alliander/Werkpakket_Monitoring_API
         - name: pythonVersion
           value: 3.9.1
         workspaces:

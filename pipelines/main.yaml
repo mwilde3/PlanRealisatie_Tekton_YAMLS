@@ -1,375 +1,433 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
+  creationTimestamp: '2021-10-04T11:36:32Z'
+  generation: 2
+  managedFields:
+    - apiVersion: tekton.dev/v1beta1
+      fieldsType: FieldsV1
+      fieldsV1:
+        'f:spec':
+          .: {}
+          'f:finally': {}
+          'f:params': {}
+          'f:tasks': {}
+          'f:workspaces': {}
+      manager: Mozilla
+      operation: Update
+      time: '2021-10-04T11:36:32Z'
   name: werkpakket-monitoring
+  namespace: ip-ppap-ops
+  resourceVersion: '1044852165'
+  selfLink: >-
+    /apis/tekton.dev/v1beta1/namespaces/ip-ppap-ops/pipelines/werkpakket-monitoring
+  uid: 5ee8dd49-c3e7-4f9d-9e9a-1527c2315995
 spec:
-  workspaces:
-  - name: shared-workspace
-  - name: git-basic-auth-creds
-  - name: release-artifacts
-  params:
-  - name: sonar-projectname
-    description: maakt nieuw sonar project aan
-  - name: image
-    description: image to build
-  - name: branch
-    description: the branch
-  - name: commit
-    description: commit to use
-  - name: commitMessage
-    description: commit message
-  - name: namespace
-    description: namespace to commit to
-  - name: appName
-    description: name of the app to use
-  - name: repoUrl
-    description: name of the repo to use
-    default: Alliander/werkpakket-monitoring
-  - name: buildName
-    description: name of the build for notifications and github
-    default: Werkpakket monitoring api
-  - name: prefixUrlForRun
-    description: prefix to add the run name to it to create links
-    default: https://console-openshift-console.apps.ocp-01.prd.ahcaws.com/k8s/ns/common-devtools-ops/tekton.dev~v1beta1~PipelineRun/
-  - name: sonarUrl
-    description: Location of sonar
-    default: http://sonarqube-ip-ppap-ops-sonarqube:9000
-  - name: pythonVersion
-    description: Version of python
-    default: "3.8"
-  - default: 'https://nexus.apps.ocp-01.prd.ahcaws.com'
-    description: The Nexus base url
-    name: nexus_url
-    type: string
-  - default: /repository/pypi-hosted/simple
-    description: The Nexus hosted repo
-    name: nexus_hosted
-    type: string
-  - default: /repository/pypi-proxy/simple
-    description: The Nexus proxied PyPi repo
-    name: nexus_proxy
-    type: string    
-  tasks:
-  - name: github-to-pending
-    taskRef:
-      name: github-set-status
-    params:
-      - name: REPO_FULL_NAME
-        value: $(params.repoUrl)
-      - name: SHA
-        value: $(params.commit)
-      - name: DESCRIPTION
-        value: "$(params.buildName) pipeline has started"
-      - name: STATE
-        value: pending
-      - name: TARGET_URL
-        value: "$(params.prefixUrlForRun)$(context.pipelineRun.name)"
-      - name: AUTH_TYPE
-        value: Basic
-      - name: GITHUB_TOKEN_SECRET_NAME
-        value: github-status
-  - name: teams-start-build-notification
-    runAfter:
-    - github-to-pending
-    taskRef:
-      name: send-to-microsoft-teams
-    params:
-    - name: webhook-url-secret 
-      value: microsoft-teams-webhook-url-secret
-    - name: webhook-url-secret-key
-      value: url
-    - name: message
-      value: ":hourglass_flowing_sand: $(params.buildName) `$(context.pipelineRun.name)` started for `$(params.appName)` to `$(params.namespace)` <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build>"
-  - name: fetch-repo
-    taskRef:
-      name: git-clone
-    workspaces:
-    - name: output
-      workspace: shared-workspace
-    - name: basic-auth
-      workspace: git-basic-auth-creds
-    runAfter:
-    - github-to-pending
-    params:
-    - name: url
-      value: https://github.com/$(params.repoUrl)
-    - name: revision
-      value: $(params.commit)
-      # needs depth 0 because of git-version!
-    - name: depth
-      value: '0'
-    - name: refspec
-      value: $(params.branch)
-  - name: pylint
-    taskRef:
-      name: pylint
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-    runAfter:
-    - fetch-repo
-    params:
-      # add the --exit-zero if you don't want the build to break
-      # when linting gives things to look it, it will only produce a report
-      # but it's offcourse better to have linting as a quality gate
-      # so if there are any linting issues this task will fail
-      - name: args
-        value: ["--extension-pkg-whitelist=pydantic", "--exit-zero"]
-      - name: path
-        value: "./app"
-      - name: image
-        value: "image-registry.openshift-image-registry.svc:5000/openshift-jenkins/openshift-jenkins-image-python-3.8"
-  - name: pytest
-    taskRef:
-      name: pytest
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-    runAfter:
-    - fetch-repo
-    params:
-      - name: PYTHON
-        value: $(params.pythonVersion)
-      # keep the junitxml parameter this way to let sonar pickup your results
-      # and coverage reports
-      - name: ARGS
-        value: "-rfs --junitxml build/results.xml --cov-config .coveragerc --cov app --cov-report xml:coverage-reports/coverage-results.xml"
-      - name: REQUIREMENTS_FILE
-        value: "tekton-test-requirements.txt"
-  - name: create-sonar-properties
-    runAfter:
-    - deploy
-    taskRef:
-      name: write-file
-    workspaces:
-      - name: output
-        workspace: shared-workspace
-    params:
-      - name: path
-        value: ./sonar-project.properties
-      - name: contents
-        value: |
-          sonar.projectKey=$(params.sonar-projectname)
-          sonar.projectName=$(params.sonar-projectname)
-          sonar.projectVersion=1.0
-          sonar.host.url=$(params.sonarUrl)
-          #sonar.branch.name=$(params.branch)
-          sonar.sources=app
-          sonar.language=python
-          sonar.tests=tests
-          sonar.junit.reportsPath=build/results.xml
-          sonar.sourceEncoding=UTF-8
-          sonar.verbose=true
-  - name: sonar
-    taskRef:
-      name: sonarqube-scanner
-    runAfter:
-    - create-sonar-properties
-    params:
-      - name: SONAR_HOST_URL
-        value: $(params.sonarUrl)
-      - name: SONAR_PROJECT_KEY
-        value: $(params.sonar-projectname)
-    workspaces:
-      - name: source-dir
-        workspace: shared-workspace
-      - name: sonar-settings
-        workspace: shared-workspace
-  - name: git-fetch-all
-    runAfter:
-      - pytest
-      - pylint
-    taskRef:
-      name: git-cli
-    params:
-    # we need all branches available for git-version
-    - name: GIT_SCRIPT
-      value: |
-        git fetch --all
-    workspaces:
-      - name: source
-        workspace: shared-workspace
-      - name: input
-        workspace: shared-workspace
-      - name: basic-auth
-        workspace: git-basic-auth-creds
-  - name: git-version
-    params:
-      - name: branch
-        value: $(params.branch)
-    runAfter:
-      - git-fetch-all
-    taskRef:
-      name: git-version
-    workspaces:
-      - name: source
-        workspace: shared-workspace
-  - name: build-container
-    taskRef:
-      name: kaniko
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-    runAfter:
-    - add-pip-conf
-    params:
-      - name: DOCKERFILE
-        value: Dockerfile.tekton
-      - name: CONTEXT
-        value: .
-      - name: IMAGE
-        value: "$(params.image):$(tasks.git-version.results.packageVersion)"
-      - name: EXTRA_ARGS
-        value: ["--skip-tls-verify"] # needed for OpenShift CA cert
-  - name: create-release-notes
-    runAfter:
-    - build-container
-    taskRef:
-      name: write-file
-    workspaces:
-      - name: output
-        workspace: shared-workspace
-    params:
-      - name: path
-        value: ./release.md
-      - name: contents
-        value: |
-          # Release notes for commit $(params.commit)
-
-          Generated the container image: $(params.image):$(tasks.git-version.results.packageVersion)@$(tasks.build-container.results.IMAGE-DIGEST)
-  - name: git-create-release
-    taskRef:
-      name: create-github-release
-    runAfter:
-    - create-release-notes
-    params:
-      - name: TAG
-        value: $(tasks.git-version.results.packageVersion)
-      - name: REVISION
-        value: $(params.commit)
-      - name: GITHUB_TOKEN_SECRET
-        value: common-github
-      - name: GITHUB_TOKEN_SECRET_KEY
-        value: password
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-    - name: release-notes
-      workspace: shared-workspace
-    - name: input
-      workspace: release-artifacts
-  - name: add-pip-conf
-    params:
-      - name: path
-        value: ./pip.conf
-      - name: mode
-        value: '0755'
-      - name: contents
-        value: |
-          [global]
-          timeout=3600
-          trusted-host=$(params.nexus_url)
-          index-url=$(params.nexus_url)$(params.nexus_hosted)
-          extra-index-url=$(params.nexus_url)$(params.nexus_proxy)
-    runAfter:
-      - git-version
-    taskRef:
-      kind: Task
-      name: write-file
-    workspaces:
-      - name: output
-        workspace: shared-workspace
-  - name: deploy
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-    runAfter:
-      - build-container
-    taskRef:
-      kind: Task
-      name: helm-upgrade-from-source
-    # One could use a timeout for the specific taskrun
-    # We should probably never hit a max of 1 hour + 1 minute + 30 secs
-    timeout: "1h1m30s"
-    params:
-    - name: charts_dir
-      value: helm
-    # besides overwriting here you also use separate values.yaml files
-    # the setup below makes it possible to inject tekton parameters into the helm chart
-    # you could for example also inject the build number into the helm chart and add it
-    # as labels inside the cluster for ultimate traceability
-    - name: overwrite_values
-      value: "namespace=$(params.namespace),app=$(params.appName),image=$(params.image):$(tasks.git-version.results.packageVersion)@$(tasks.build-container.results.IMAGE-DIGEST)"
-    - name: release_namespace
-      value: $(params.namespace)
-  - name: github-to-success
-    runAfter:
-      - deploy
-    taskRef:
-      name: github-set-status
-    params:
-      - name: REPO_FULL_NAME
-        value: $(params.repoUrl)
-      - name: SHA
-        value: $(params.commit)
-      - name: DESCRIPTION
-        value: "$(params.buildName) pipeline was succesfull"
-      - name: STATE
-        value: success
-      - name: TARGET_URL
-        value: "$(params.prefixUrlForRun)$(context.pipelineRun.name)"
-      - name: AUTH_TYPE
-        value: Basic
-      - name: GITHUB_TOKEN_SECRET_NAME
-        value: github-status
-  - name: teams-succeeded-build-notification
-    runAfter:
-    - deploy
-    taskRef:
-      name: send-to-microsoft-teams
-    params:
-      - name: webhook-url-secret 
-        value: microsoft-teams-webhook-url-secret
-      - name: webhook-url-secret-key
-        value: url
-      - name: message
-        value: ":partying_face: $(params.buildName) `$(context.pipelineRun.name)` succeeded for `$(params.appName)` to `$(params.namespace)` <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build> <https://$(params.appName)-$(params.namespace).apps.ocp-prd.alliander.com|Live view>"
   finally:
     - name: teams-failed-build-notification
-      # these are guard expressions which can be configured per task
-      # to make sure we only run finally tasks on certain conditions
-      when:
-        - input: $(tasks.github-to-success.status)
-          operator: in
-          values: ["Failed", "None"]
-      taskRef:
-        name: send-to-microsoft-teams
       params:
-        - name: webhook-url-secret 
+        - name: webhook-url-secret
           value: microsoft-teams-webhook-url-secret
         - name: webhook-url-secret-key
           value: url
         - name: message
-          value: ":boom: $(params.buildName) `$(context.pipelineRun.name)` failed for `$(params.appName)` to `$(params.namespace)` <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build>"
-    - name: notify-any-failure
+          value: >-
+            :boom: $(params.buildName) `$(context.pipelineRun.name)` failed for
+            `$(params.appName)` to `$(params.namespace)`
+            <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build>
+      taskRef:
+        kind: Task
+        name: send-to-microsoft-teams
       when:
         - input: $(tasks.github-to-success.status)
           operator: in
-          values: ["Failed", "None"]
-      taskRef:
-        name: github-set-status
+          values:
+            - Failed
+            - None
+    - name: notify-any-failure
       params:
         - name: REPO_FULL_NAME
           value: $(params.repoUrl)
         - name: SHA
           value: $(params.commit)
         - name: DESCRIPTION
-          value: "$(params.buildName) pipeline failed"
+          value: $(params.buildName) pipeline failed
         - name: STATE
           value: failure
         - name: TARGET_URL
-          value: "$(params.prefixUrlForRun)$(context.pipelineRun.name)"
+          value: $(params.prefixUrlForRun)$(context.pipelineRun.name)
         - name: AUTH_TYPE
           value: Basic
         - name: GITHUB_TOKEN_SECRET_NAME
           value: github-status
+      taskRef:
+        kind: Task
+        name: github-set-status
+      when:
+        - input: $(tasks.github-to-success.status)
+          operator: in
+          values:
+            - Failed
+            - None
+  params:
+    - description: maakt nieuw sonar project aan
+      name: sonar-projectname
+      type: string
+    - description: image to build
+      name: image
+      type: string
+    - description: the branch
+      name: branch
+      type: string
+    - description: commit to use
+      name: commit
+      type: string
+    - description: commit message
+      name: commitMessage
+      type: string
+    - description: namespace to commit to
+      name: namespace
+      type: string
+    - description: name of the app to use
+      name: appName
+      type: string
+    - default: Alliander/werkpakket-monitoring
+      description: name of the repo to use
+      name: repoUrl
+      type: string
+    - default: Werkpakket monitoring api
+      description: name of the build for notifications and github
+      name: buildName
+      type: string
+    - default: >-
+        https://console-openshift-console.apps.ocp-01.prd.ahcaws.com/k8s/ns/common-devtools-ops/tekton.dev~v1beta1~PipelineRun/
+      description: prefix to add the run name to it to create links
+      name: prefixUrlForRun
+      type: string
+    - default: 'http://sonarqube-ip-ppap-ops-sonarqube:9000'
+      description: Location of sonar
+      name: sonarUrl
+      type: string
+    - default: '3.8'
+      description: Version of python
+      name: pythonVersion
+      type: string
+    - default: 'https://nexus.apps.ocp-01.prd.ahcaws.com'
+      description: The Nexus base url
+      name: nexus_url
+      type: string
+    - default: /repository/pypi-hosted/simple
+      description: The Nexus hosted repo
+      name: nexus_hosted
+      type: string
+    - default: /repository/pypi-proxy/simple
+      description: The Nexus proxied PyPi repo
+      name: nexus_proxy
+      type: string
+  tasks:
+    - name: github-to-pending
+      params:
+        - name: REPO_FULL_NAME
+          value: $(params.repoUrl)
+        - name: SHA
+          value: $(params.commit)
+        - name: DESCRIPTION
+          value: $(params.buildName) pipeline has started
+        - name: STATE
+          value: pending
+        - name: TARGET_URL
+          value: $(params.prefixUrlForRun)$(context.pipelineRun.name)
+        - name: AUTH_TYPE
+          value: Basic
+        - name: GITHUB_TOKEN_SECRET_NAME
+          value: github-status
+      taskRef:
+        kind: Task
+        name: github-set-status
+    - name: teams-start-build-notification
+      params:
+        - name: webhook-url-secret
+          value: microsoft-teams-webhook-url-secret
+        - name: webhook-url-secret-key
+          value: url
+        - name: message
+          value: >-
+            :hourglass_flowing_sand: $(params.buildName)
+            `$(context.pipelineRun.name)` started for `$(params.appName)` to
+            `$(params.namespace)`
+            <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build>
+      runAfter:
+        - github-to-pending
+      taskRef:
+        kind: Task
+        name: send-to-microsoft-teams
+    - name: fetch-repo
+      params:
+        - name: url
+          value: 'https://github.com/$(params.repoUrl)'
+        - name: revision
+          value: $(params.commit)
+        - name: depth
+          value: '0'
+        - name: refspec
+          value: $(params.branch)
+      runAfter:
+        - github-to-pending
+      taskRef:
+        kind: Task
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+        - name: basic-auth
+          workspace: git-basic-auth-creds
+    - name: pylint
+      params:
+        - name: args
+          value:
+            - '--extension-pkg-whitelist=pydantic'
+            - '--exit-zero'
+        - name: path
+          value: ./app
+        - name: image
+          value: >-
+            image-registry.openshift-image-registry.svc:5000/openshift-jenkins/openshift-jenkins-image-python-3.8
+      runAfter:
+        - fetch-repo
+      taskRef:
+        kind: Task
+        name: pylint
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: pytest
+      params:
+        - name: PYTHON
+          value: $(params.pythonVersion)
+        - name: ARGS
+          value: >-
+            -rfs --junitxml build/results.xml --cov-config .coveragerc --cov app
+            --cov-report xml:coverage-reports/coverage-results.xml
+        - name: REQUIREMENTS_FILE
+          value: tekton-test-requirements.txt
+      runAfter:
+        - fetch-repo
+      taskRef:
+        kind: Task
+        name: pytest
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: create-sonar-properties
+      params:
+        - name: path
+          value: ./sonar-project.properties
+        - name: contents
+          value: |
+            sonar.projectKey=$(params.sonar-projectname)
+            sonar.projectName=$(params.sonar-projectname)
+            sonar.projectVersion=1.0
+            sonar.host.url=$(params.sonarUrl)
+            #sonar.branch.name=$(params.branch)
+            sonar.sources=app
+            sonar.language=python
+            sonar.tests=tests
+            sonar.junit.reportsPath=build/results.xml
+            sonar.sourceEncoding=UTF-8
+            sonar.verbose=true
+      runAfter:
+        - deploy
+      taskRef:
+        kind: Task
+        name: write-file
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: sonar
+      params:
+        - name: SONAR_HOST_URL
+          value: $(params.sonarUrl)
+        - name: SONAR_PROJECT_KEY
+          value: $(params.sonar-projectname)
+      runAfter:
+        - create-sonar-properties
+      taskRef:
+        kind: Task
+        name: sonarqube-scanner
+      workspaces:
+        - name: source-dir
+          workspace: shared-workspace
+        - name: sonar-settings
+          workspace: shared-workspace
+    - name: git-fetch-all
+      params:
+        - name: GIT_SCRIPT
+          value: |
+            git fetch --all
+      runAfter:
+        - pytest
+        - pylint
+      taskRef:
+        kind: Task
+        name: git-cli
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: input
+          workspace: shared-workspace
+        - name: basic-auth
+          workspace: git-basic-auth-creds
+    - name: git-version
+      params:
+        - name: branch
+          value: $(params.branch)
+      runAfter:
+        - git-fetch-all
+      taskRef:
+        kind: Task
+        name: git-version
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: build-container
+      params:
+        - name: DOCKERFILE
+          value: Dockerfile.tekton
+        - name: CONTEXT
+          value: .
+        - name: IMAGE
+          value: '$(params.image):$(tasks.git-version.results.packageVersion)'
+        - name: EXTRA_ARGS
+          value:
+            - '--skip-tls-verify'
+      runAfter:
+        - add-pip-conf
+      taskRef:
+        kind: Task
+        name: kaniko
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: create-release-notes
+      params:
+        - name: path
+          value: ./release.md
+        - name: contents
+          value: >
+            # Release notes for commit $(params.commit)
+
+
+            Generated the container image:
+            $(params.image):$(tasks.git-version.results.packageVersion)@$(tasks.build-container.results.IMAGE-DIGEST)
+      runAfter:
+        - build-container
+      taskRef:
+        kind: Task
+        name: write-file
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: git-create-release
+      params:
+        - name: TAG
+          value: $(tasks.git-version.results.packageVersion)
+        - name: REVISION
+          value: $(params.commit)
+        - name: GITHUB_TOKEN_SECRET
+          value: github-status
+        - name: GITHUB_TOKEN_SECRET_KEY
+          value: password
+      runAfter:
+        - create-release-notes
+      taskRef:
+        kind: Task
+        name: create-github-release
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: release-notes
+          workspace: shared-workspace
+        - name: input
+          workspace: release-artifacts
+    - name: add-pip-conf
+      params:
+        - name: path
+          value: ./pip.conf
+        - name: mode
+          value: '0755'
+        - name: contents
+          value: |
+            [global]
+            timeout=3600
+            trusted-host=$(params.nexus_url)
+            index-url=$(params.nexus_url)$(params.nexus_hosted)
+            extra-index-url=$(params.nexus_url)$(params.nexus_proxy)
+      runAfter:
+        - git-version
+      taskRef:
+        kind: Task
+        name: write-file
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: deploy
+      params:
+        - name: charts_dir
+          value: helm
+        - name: overwrite_values
+          value: >-
+            namespace=$(params.namespace),app=$(params.appName),image=$(params.image):$(tasks.git-version.results.packageVersion)@$(tasks.build-container.results.IMAGE-DIGEST)
+        - name: release_namespace
+          value: $(params.namespace)
+      runAfter:
+        - build-container
+      taskRef:
+        kind: Task
+        name: helm-upgrade-from-source
+      timeout: 1h1m30s
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: github-to-success
+      params:
+        - name: REPO_FULL_NAME
+          value: $(params.repoUrl)
+        - name: SHA
+          value: $(params.commit)
+        - name: DESCRIPTION
+          value: $(params.buildName) pipeline was succesfull
+        - name: STATE
+          value: success
+        - name: TARGET_URL
+          value: $(params.prefixUrlForRun)$(context.pipelineRun.name)
+        - name: AUTH_TYPE
+          value: Basic
+        - name: GITHUB_TOKEN_SECRET_NAME
+          value: github-status
+      runAfter:
+        - deploy
+      taskRef:
+        kind: Task
+        name: github-set-status
+    - name: teams-succeeded-build-notification
+      params:
+        - name: webhook-url-secret
+          value: microsoft-teams-webhook-url-secret
+        - name: webhook-url-secret-key
+          value: url
+        - name: message
+          value: >-
+            :partying_face: $(params.buildName) `$(context.pipelineRun.name)`
+            succeeded for `$(params.appName)` to `$(params.namespace)`
+            <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build>
+            <https://$(params.appName)-$(params.namespace).apps.ocp-prd.alliander.com|Live
+            view>
+      runAfter:
+        - deploy
+      taskRef:
+        kind: Task
+        name: send-to-microsoft-teams
+  workspaces:
+    - name: shared-workspace
+    - name: git-basic-auth-creds
+    - name: release-artifacts

@@ -23,7 +23,7 @@ spec:
             - key: branch
               expression: "body.ref.split('/')[2]"
       - cel:
-          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_API']"
     bindings:
       - ref: github-push
       - name: branch
@@ -43,7 +43,7 @@ spec:
             - key: branch
               expression: "body.ref.split('/')[2]"
       - cel:
-          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_API']"
     bindings:
       - ref: github-push
       - name: branch
@@ -63,7 +63,7 @@ spec:
             - key: branch
               expression: "body.ref.split('/')[2]"
       - cel:
-          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_API']"
     bindings:
       - ref: github-push
       - name: branch
@@ -83,7 +83,7 @@ spec:
             - key: branch
               expression: "body.ref.split('/')[2]"
       - cel:
-          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_Dash']"
+          filter: "body.repository.full_name in ['Alliander/Werkpakket_Monitoring_API']"
     bindings:
       - ref: github-push
       - name: branch
