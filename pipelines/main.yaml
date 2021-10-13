@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   creationTimestamp: '2021-10-04T11:36:32Z'
-  generation: 2
+  generation: 3
   managedFields:
     - apiVersion: tekton.dev/v1beta1
       fieldsType: FieldsV1
@@ -18,57 +18,12 @@ metadata:
       time: '2021-10-04T11:36:32Z'
   name: werkpakket-monitoring
   namespace: ip-ppap-ops
-  resourceVersion: '1044852165'
+  resourceVersion: '1044926818'
   selfLink: >-
     /apis/tekton.dev/v1beta1/namespaces/ip-ppap-ops/pipelines/werkpakket-monitoring
   uid: 5ee8dd49-c3e7-4f9d-9e9a-1527c2315995
 spec:
   finally:
-    - name: teams-failed-build-notification
-      params:
-        - name: webhook-url-secret
-          value: microsoft-teams-webhook-url-secret
-        - name: webhook-url-secret-key
-          value: url
-        - name: message
-          value: >-
-            :boom: $(params.buildName) `$(context.pipelineRun.name)` failed for
-            `$(params.appName)` to `$(params.namespace)`
-            <$(params.prefixUrlForRun)$(context.pipelineRun.name)|Build>
-      taskRef:
-        kind: Task
-        name: send-to-microsoft-teams
-      when:
-        - input: $(tasks.github-to-success.status)
-          operator: in
-          values:
-            - Failed
-            - None
-    - name: notify-any-failure
-      params:
-        - name: REPO_FULL_NAME
-          value: $(params.repoUrl)
-        - name: SHA
-          value: $(params.commit)
-        - name: DESCRIPTION
-          value: $(params.buildName) pipeline failed
-        - name: STATE
-          value: failure
-        - name: TARGET_URL
-          value: $(params.prefixUrlForRun)$(context.pipelineRun.name)
-        - name: AUTH_TYPE
-          value: Basic
-        - name: GITHUB_TOKEN_SECRET_NAME
-          value: github-status
-      taskRef:
-        kind: Task
-        name: github-set-status
-      when:
-        - input: $(tasks.github-to-success.status)
-          operator: in
-          values:
-            - Failed
-            - None
   params:
     - description: maakt nieuw sonar project aan
       name: sonar-projectname
@@ -308,47 +263,6 @@ spec:
       workspaces:
         - name: source
           workspace: shared-workspace
-    - name: create-release-notes
-      params:
-        - name: path
-          value: ./release.md
-        - name: contents
-          value: >
-            # Release notes for commit $(params.commit)
-
-
-            Generated the container image:
-            $(params.image):$(tasks.git-version.results.packageVersion)@$(tasks.build-container.results.IMAGE-DIGEST)
-      runAfter:
-        - build-container
-      taskRef:
-        kind: Task
-        name: write-file
-      workspaces:
-        - name: output
-          workspace: shared-workspace
-    - name: git-create-release
-      params:
-        - name: TAG
-          value: $(tasks.git-version.results.packageVersion)
-        - name: REVISION
-          value: $(params.commit)
-        - name: GITHUB_TOKEN_SECRET
-          value: github-status
-        - name: GITHUB_TOKEN_SECRET_KEY
-          value: password
-      runAfter:
-        - create-release-notes
-      taskRef:
-        kind: Task
-        name: create-github-release
-      workspaces:
-        - name: source
-          workspace: shared-workspace
-        - name: release-notes
-          workspace: shared-workspace
-        - name: input
-          workspace: release-artifacts
     - name: add-pip-conf
       params:
         - name: path
@@ -388,27 +302,6 @@ spec:
       workspaces:
         - name: source
           workspace: shared-workspace
-    - name: github-to-success
-      params:
-        - name: REPO_FULL_NAME
-          value: $(params.repoUrl)
-        - name: SHA
-          value: $(params.commit)
-        - name: DESCRIPTION
-          value: $(params.buildName) pipeline was succesfull
-        - name: STATE
-          value: success
-        - name: TARGET_URL
-          value: $(params.prefixUrlForRun)$(context.pipelineRun.name)
-        - name: AUTH_TYPE
-          value: Basic
-        - name: GITHUB_TOKEN_SECRET_NAME
-          value: github-status
-      runAfter:
-        - deploy
-      taskRef:
-        kind: Task
-        name: github-set-status
     - name: teams-succeeded-build-notification
       params:
         - name: webhook-url-secret
